@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pro CSV Analysis Tool</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.js"></script>
+    
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --ring: rgba(79, 70, 229, 0.2);
+            --chart-grid: #e2e8f0;
+            --stats-bg: #eef2ff;
+            --stats-text: #3730a3;
+            --success: #10b981;
+            --success-bg: #d1fae5;
+            --error: #ef4444;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        [data-theme="dark"] {
+            --primary: #6366f1;
+            --primary-hover: #818cf8;
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --ring: rgba(99, 102, 241, 0.4);
+            --chart-grid: #334155;
+            --stats-bg: #312e81;
+            --stats-text: #e0e7ff;
+            --success: #34d399;
+            --success-bg: #064e3b;
+        }
+
+        * { box-sizing: border-box; }
+
+        body { 
+            font-family: 'Inter', sans-serif; 
+            max-width: 900px; 
+            margin: 0 auto; 
+            padding: 2rem 1.5rem; 
+            color: var(--text-main); 
+            background-color: var(--bg-color);
+            line-height: 1.5;
+            transition: var(--transition);
+        }
+
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+        h1 { font-weight: 700; font-size: 2rem; margin: 0; background: linear-gradient(135deg, var(--primary), #a855f7); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        
+        .theme-toggle { background: var(--card-bg); border: 1px solid var(--border); color: var(--text-main); padding: 0.5rem; border-radius: 50%; cursor: pointer; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; transition: var(--transition); }
+        .theme-toggle:hover { border-color: var(--primary); }
+        .theme-toggle svg { width: 20px; height: 20px; }
+
+        h2 { font-size: 1.25rem; font-weight: 600; margin-top: 0; }
+
+        .card { background: var(--card-bg); border: 1px solid var(--border); padding: 2rem; border-radius: 16px; margin-bottom: 2rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05); transition: var(--transition); }
+
+        .form-group { margin-bottom: 1.75rem; }
+        label { font-weight: 600; display: block; margin-bottom: 0.75rem; color: var(--text-main); font-size: 0.95rem; }
+
+        .file-upload-wrapper { border: 2px dashed var(--border); border-radius: 12px; padding: 2.5rem 2rem; text-align: center; background: var(--bg-color); cursor: pointer; transition: var(--transition); }
+        .file-upload-wrapper:hover { border-color: var(--primary); }
+        .file-upload-wrapper.loaded { border-color: var(--success); background: var(--success-bg); }
+        .file-upload-wrapper svg { width: 40px; height: 40px; color: var(--text-muted); margin-bottom: 1rem; }
+        .file-upload-wrapper.loaded svg { color: var(--success); }
+        .file-upload-wrapper p { margin: 0; color: var(--text-muted); font-size: 0.95rem; }
+        .file-upload-wrapper input[type="file"] { display: none; }
+        .file-name { margin-top: 0.5rem !important; font-weight: 600; color: var(--primary) !important; }
+
+        select { padding: 0.75rem 1rem; width: 100%; max-width: 400px; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; font-size: 0.95rem; color: var(--text-main); background-color: var(--card-bg); }
+        select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--ring); }
+
+        .checkbox-group { display: flex; flex-wrap: wrap; gap: 1rem; }
+        .checkbox-label { display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer; padding: 0.6rem 1.2rem; background: var(--bg-color); border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem; color: var(--text-main); }
+        .checkbox-label:hover { border-color: var(--primary); }
+        .checkbox-label input[type="checkbox"] { width: 1.1rem; height: 1.1rem; accent-color: var(--primary); }
+
+        .btn-group { display: flex; gap: 1rem; margin-top: 1rem; }
+        button { background: var(--primary); color: white; border: none; border-radius: 8px; padding: 0.875rem 1.5rem; cursor: pointer; font-weight: 600; font-size: 1rem; width: 100%; transition: var(--transition); }
+        button:hover { background: var(--primary-hover); transform: translateY(-2px); box-shadow: 0 6px 8px -1px rgba(79, 70, 229, 0.3); }
+        button.secondary { background: var(--bg-color); color: var(--text-main); border: 1px solid var(--border); }
+        button.secondary:hover { background: var(--border); box-shadow: none; }
+        button.small { padding: 0.5rem 1rem; font-size: 0.85rem; width: auto; }
+
+        #variable-selection, #results, #notes-section { display: none; animation: slideUp 0.5s ease-out; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+
+        .stats-box { background: var(--stats-bg); padding: 1.5rem; border-radius: 12px; margin-bottom: 2rem; border-left: 4px solid var(--primary); }
+        .stats-box p { margin: 0.5rem 0; color: var(--stats-text); }
+        
+        .chart-container { position: relative; height: 450px; width: 100%; margin-top: 1rem; background: var(--card-bg); border-radius: 8px;}
+        
+        /* Multi-Page Notes Layout */
+        .notes-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+        .save-status { font-size: 0.85rem; color: var(--success); opacity: 0; transition: opacity 0.3s; font-weight: 600; }
+        
+        .notes-layout { display: flex; gap: 1.5rem; }
+        .notes-sidebar { flex: 0 0 160px; border-right: 1px solid var(--border); padding-right: 1.5rem; display: flex; flex-direction: column; }
+        .notes-list { list-style: none; padding: 0; margin: 1rem 0 0 0; display: flex; flex-direction: column; gap: 0.25rem; }
+        
+        .note-tab { padding: 0.6rem 0.75rem; border-radius: 6px; cursor: pointer; font-size: 0.9rem; color: var(--text-muted); transition: var(--transition); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border: 1px solid transparent; }
+        .note-tab:hover { background: var(--bg-color); color: var(--text-main); }
+        .note-tab.active { background: var(--stats-bg); color: var(--primary); font-weight: 600; border-color: var(--ring); }
+        
+        .notes-editor { flex: 1; display: flex; flex-direction: column; gap: 0.75rem; }
+        .note-title-input { width: 100%; font-size: 1.1rem; font-weight: 600; border: none; background: transparent; color: var(--text-main); padding: 0 0 0.5rem 0; border-bottom: 2px solid var(--border); font-family: inherit; transition: var(--transition); }
+        .note-title-input:focus { outline: none; border-bottom-color: var(--primary); }
+        
+        textarea { width: 100%; height: 200px; padding: 1rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-color); color: var(--text-main); font-family: inherit; resize: vertical; margin-top: 0.5rem; line-height: 1.6; }
+        textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--ring); }
+
+        .toast { position: fixed; bottom: 2rem; right: 2rem; background: var(--card-bg); border-left: 4px solid var(--error); color: var(--text-main); padding: 1rem 1.5rem; border-radius: 8px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); z-index: 1000; transform: translateX(120%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); display: flex; align-items: center; gap: 0.75rem; }
+        .toast.show { transform: translateX(0); }
+
+        @media (max-width: 650px) {
+            .notes-layout { flex-direction: column; }
+            .notes-sidebar { flex: none; border-right: none; border-bottom: 1px solid var(--border); padding-right: 0; padding-bottom: 1rem; }
+            .notes-list { flex-direction: row; overflow-x: auto; padding-bottom: 0.5rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Data Analyzer Pro</h1>
+        <button class="theme-toggle" id="theme-toggle" aria-label="Toggle Dark Mode">
+            <svg id="theme-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+            </svg>
+        </button>
+    </div>
+
+    <div class="card" id="upload-card">
+        <div class="form-group">
+            <label>1. Upload Data Set</label>
+            <div class="file-upload-wrapper" id="dropzone" onclick="document.getElementById('file-upload').click()">
+                <svg id="upload-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                </svg>
+                <p id="dropzone-text">Click to upload or drag and drop your CSV</p>
+                <input type="file" id="file-upload" accept=".csv">
+                <p id="file-name" class="file-name"></p>
+            </div>
+        </div>
+
+        <div id="variable-selection">
+            <div class="form-group">
+                <label for="response-var">2. Select Response Variable (Y-Axis)</label>
+                <select id="response-var"></select>
+            </div>
+            
+            <div class="form-group">
+                <label>3. Select Explanatory Variables (X-Axis Predictors)</label>
+                <div class="checkbox-group" id="explanatory-vars"></div>
+            </div>
+            
+            <div class="btn-group">
+                <button id="analyze-btn">Generate Analysis</button>
+                <button id="reset-btn" class="secondary" style="max-width: 150px;">Reset</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="results" class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h2>Statistical Breakdown</h2>
+            <button id="download-chart-btn" class="secondary small">Download Chart (PNG)</button>
+        </div>
+        <div class="stats-box" id="stats-output"></div>
+        <div class="chart-container">
+            <canvas id="scatter-chart"></canvas>
+        </div>
+    </div>
+
+    <div id="notes-section" class="card">
+        <div class="notes-header">
+            <h2 style="margin: 0;">Analysis Notebook</h2>
+            <span class="save-status" id="save-status">Saved successfully!</span>
+        </div>
+        
+        <div class="notes-layout">
+            <div class="notes-sidebar">
+                <button id="add-page-btn" class="secondary small">+ New Page</button>
+                <ul id="notes-list" class="notes-list"></ul>
+            </div>
+            
+            <div class="notes-editor">
+                <input type="text" id="note-title" class="note-title-input" placeholder="Give this page a title...">
+                <textarea id="user-notes" placeholder="Type your observations, anomalies, or reminders here..."></textarea>
+                <div style="display: flex; justify-content: flex-end; margin-top: 0.5rem;">
+                    <button id="save-notes-btn" class="small" style="background: var(--success);">Save Page</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast">
+        <svg style="color: var(--error); width: 24px; height: 24px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        <span id="toast-msg">Error</span>
+    </div>
+
+    <script>
+        // Theme Management
+        const themeToggle = document.getElementById('theme-toggle');
+        const themeIcon = document.getElementById('theme-icon');
+        
+        if (localStorage.getItem('theme') === 'dark' || (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.setAttribute('data-theme', 'dark');
+            setSunIcon();
+        }
+
+        themeToggle.addEventListener('click', () => {
+            const currentTheme = document.documentElement.getAttribute('data-theme');
+            if (currentTheme === 'dark') {
+                document.documentElement.removeAttribute('data-theme');
+                localStorage.setItem('theme', 'light');
+                setMoonIcon();
+            } else {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                localStorage.setItem('theme', 'dark');
+                setSunIcon();
+            }
+            updateChartTheme(); 
+        });
+
+        function setSunIcon() { themeIcon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>`; }
+        function setMoonIcon() { themeIcon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>`; }
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-msg').textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 4000);
+        }
+
+        // Global State
+        let parsedData = [];
+        let headers = [];
+        let chartInstance = null;
+        let currentChartData = null; 
+        let currentFileName = ""; 
+        
+        // Notes State
+        let notesData = [];
+        let activeNoteId = null;
+
+        Chart.defaults.font.family = "'Inter', sans-serif";
+
+        // ---- Multi-Page Notes Logic ----
+        function loadNotesForFile(fileName) {
+            const saved = localStorage.getItem(`notes_${fileName}`);
+            if (saved) {
+                try {
+                    notesData = JSON.parse(saved);
+                } catch (e) {
+                    // Fallback for older versions that just saved a string
+                    notesData = [{ id: Date.now(), title: 'Page 1', content: saved }];
+                }
+            } else {
+                notesData = [{ id: Date.now(), title: 'Page 1', content: '' }];
+            }
+            activeNoteId = notesData[0].id;
+            renderNotesSidebar();
+            loadActiveNote();
+        }
+
+        function renderNotesSidebar() {
+            const list = document.getElementById('notes-list');
+            list.innerHTML = '';
+            notesData.forEach((note, index) => {
+                const li = document.createElement('li');
+                li.className = `note-tab ${note.id === activeNoteId ? 'active' : ''}`;
+                li.textContent = note.title || `Untitled Page ${index + 1}`;
+                li.onclick = () => { 
+                    activeNoteId = note.id; 
+                    renderNotesSidebar(); 
+                    loadActiveNote(); 
+                };
+                list.appendChild(li);
+            });
+        }
+
+        function loadActiveNote() {
+            const activeNote = notesData.find(n => n.id === activeNoteId);
+            if (activeNote) {
+                document.getElementById('note-title').value = activeNote.title;
+                document.getElementById('user-notes').value = activeNote.content;
+            }
+        }
+
+        document.getElementById('add-page-btn').addEventListener('click', () => {
+            const newNote = { id: Date.now(), title: `Page ${notesData.length + 1}`, content: '' };
+            notesData.push(newNote);
+            activeNoteId = newNote.id;
+            renderNotesSidebar();
+            loadActiveNote();
+        });
+
+        document.getElementById('save-notes-btn').addEventListener('click', () => {
+            const activeNote = notesData.find(n => n.id === activeNoteId);
+            if (activeNote && currentFileName) {
+                activeNote.title = document.getElementById('note-title').value || 'Untitled Page';
+                activeNote.content = document.getElementById('user-notes').value;
+                
+                localStorage.setItem(`notes_${currentFileName}`, JSON.stringify(notesData));
+                
+                renderNotesSidebar(); // Refresh sidebar to show new title
+                
+                const status = document.getElementById('save-status');
+                status.style.opacity = '1';
+                setTimeout(() => status.style.opacity = '0', 2500);
+            }
+        });
+
+        // ---- App Logic ----
+        
+        // File Upload
+        document.getElementById('file-upload').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            currentFileName = file.name;
+
+            document.getElementById('file-name').textContent = "Loaded: " + file.name;
+            document.getElementById('dropzone-text').textContent = "File ready for analysis";
+            document.getElementById('dropzone').classList.add('loaded');
+            document.getElementById('upload-icon').innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>`;
+
+            // Initialize multi-page notes for this specific file
+            loadNotesForFile(currentFileName);
+
+            Papa.parse(file, {
+                header: true,
+                dynamicTyping: true,
+                skipEmptyLines: true,
+                complete: function(results) {
+                    parsedData = results.data;
+                    headers = results.meta.fields;
+                    setupVariableSelection();
+                }
+            });
+        });
+
+        // App Reset
+        document.getElementById('reset-btn').addEventListener('click', function() {
+            document.getElementById('file-upload').value = "";
+            document.getElementById('dropzone-text').textContent = "Click to upload or drag and drop your CSV";
+            document.getElementById('file-name').textContent = "";
+            document.getElementById('dropzone').classList.remove('loaded');
+            document.getElementById('upload-icon').innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>`;
+            
+            document.getElementById('variable-selection').style.display = 'none';
+            document.getElementById('results').style.display = 'none';
+            document.getElementById('notes-section').style.display = 'none';
+            
+            parsedData = [];
+            currentFileName = "";
+            notesData = [];
+            activeNoteId = null;
+            
+            if (chartInstance) chartInstance.destroy();
+        });
+
+        function setupVariableSelection() {
+            const responseSelect = document.getElementById('response-var');
+            const explContainer = document.getElementById('explanatory-vars');
+
+            responseSelect.innerHTML = '';
+            explContainer.innerHTML = '';
+
+            let hasNumeric = false;
+            headers.forEach(header => {
+                const isNumeric = parsedData.some(row => typeof row[header] === 'number');
+                if (!isNumeric) return;
+                hasNumeric = true;
+
+                const option = document.createElement('option');
+                option.value = header;
+                option.textContent = header;
+                responseSelect.appendChild(option);
+
+                const label = document.createElement('label');
+                label.className = 'checkbox-label';
+                label.innerHTML = `<input type="checkbox" value="${header}" class="expl-check"> ${header}`;
+                explContainer.appendChild(label);
+            });
+
+            if (!hasNumeric) { showToast("No numeric data columns found in this CSV."); return; }
+            document.getElementById('variable-selection').style.display = 'block';
+        }
+
+        document.getElementById('analyze-btn').addEventListener('click', function() {
+            const yVar = document.getElementById('response-var').value;
+            const xVars = Array.from(document.querySelectorAll('.expl-check:checked')).map(cb => cb.value);
+
+            if (!yVar || xVars.length === 0) { showToast('Please select a response variable and at least one explanatory variable.'); return; }
+
+            const validData = parsedData.filter(row => {
+                if (typeof row[yVar] !== 'number') return false;
+                for (let x of xVars) { if (typeof row[x] !== 'number') return false; }
+                return true;
+            });
+
+            if (validData.length === 0) { showToast('No valid numeric data found for the selected variables.'); return; }
+            runRegression(validData, yVar, xVars);
+        });
+
+        function runRegression(data, yVar, xVars) {
+            const n = data.length;
+            const Y = data.map(row => [row[yVar]]);
+            const X = data.map(row => {
+                const rowVals = [1]; 
+                xVars.forEach(x => rowVals.push(row[x]));
+                return rowVals;
+            });
+
+            try {
+                const X_mat = math.matrix(X);
+                const Y_mat = math.matrix(Y);
+                const X_T = math.transpose(X_mat);
+                const X_T_X_inv = math.inv(math.multiply(X_T, X_mat));
+                const B = math.multiply(X_T_X_inv, math.multiply(X_T, Y_mat)).toArray().map(val => val[0]);
+
+                const yMean = math.mean(Y.map(y => y[0]));
+                let ssTot = 0, ssRes = 0;
+
+                for (let i = 0; i < n; i++) {
+                    const actualY = Y[i][0];
+                    let predY = B[0]; 
+                    for (let j = 0; j < xVars.length; j++) { predY += B[j+1] * X[i][j+1]; }
+                    ssTot += Math.pow(actualY - yMean, 2);
+                    ssRes += Math.pow(actualY - predY, 2);
+                }
+
+                displayStats(B, xVars, 1 - (ssRes / ssTot), n);
+                currentChartData = { data, yVar, xVars, B };
+                generateChart(currentChartData);
+                
+                document.getElementById('notes-section').style.display = 'block';
+
+            } catch (err) { showToast('Math Error: ' + err.message); }
+        }
+
+        function displayStats(coefficients, xVars, rSquared, n) {
+            let eq = `<strong>Y</strong> = ${coefficients[0].toFixed(4)}`;
+            xVars.forEach((x, i) => {
+                const coef = coefficients[i+1];
+                eq += ` ${coef >= 0 ? '+' : '-'} ${Math.abs(coef).toFixed(4)} <strong>(${x})</strong>`;
+            });
+
+            document.getElementById('stats-output').innerHTML = `
+                <p class="equation"><strong>Equation:</strong><br>${eq}</p>
+                <div style="height: 1px; background: var(--border); margin: 1rem 0; opacity: 0.5;"></div>
+                <p><strong>R² (Accuracy):</strong> ${rSquared.toFixed(4)}</p>
+                <p><strong>Sample Size (n):</strong> ${n}</p>`;
+            
+            document.getElementById('results').style.display = 'block';
+            setTimeout(() => document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+        }
+
+        function generateChart({ data, yVar, xVars, B }) {
+            const ctx = document.getElementById('scatter-chart').getContext('2d');
+            if (chartInstance) chartInstance.destroy();
+
+            const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+            const primaryX = xVars[0]; 
+            const datasets = [{
+                label: `Data Points`,
+                data: data.map(row => ({ x: row[primaryX], y: row[yVar] })),
+                backgroundColor: isDark ? 'rgba(129, 140, 248, 0.8)' : 'rgba(79, 70, 229, 0.7)',
+                borderColor: isDark ? '#818cf8' : '#4f46e5',
+                type: 'scatter'
+            }];
+
+            if (xVars.length === 1) {
+                const xVals = data.map(row => row[primaryX]);
+                datasets.push({
+                    label: 'Trendline',
+                    data: [ { x: Math.min(...xVals), y: B[0] + B[1] * Math.min(...xVals) }, { x: Math.max(...xVals), y: B[0] + B[1] * Math.max(...xVals) } ],
+                    borderColor: '#f43f5e', borderWidth: 3, type: 'line', fill: false, pointRadius: 0
+                });
+            }
+
+            // Ensure background is solid white/dark for PNG exporting
+            const plugin = {
+                id: 'customCanvasBackgroundColor',
+                beforeDraw: (chart) => {
+                    const ctx = chart.canvas.getContext('2d');
+                    ctx.save();
+                    ctx.globalCompositeOperation = 'destination-over';
+                    ctx.fillStyle = isDark ? '#1e293b' : '#ffffff';
+                    ctx.fillRect(0, 0, chart.width, chart.height);
+                    ctx.restore();
+                }
+            };
+
+            chartInstance = new Chart(ctx, {
+                data: { datasets },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    color: isDark ? '#94a3b8' : '#64748b',
+                    scales: {
+                        x: { title: { display: true, text: primaryX }, grid: { color: isDark ? '#334155' : '#e2e8f0' } },
+                        y: { title: { display: true, text: yVar }, grid: { color: isDark ? '#334155' : '#e2e8f0' } }
+                    }
+                },
+                plugins: [plugin]
+            });
+        }
+
+        function updateChartTheme() { if (chartInstance && currentChartData) generateChart(currentChartData); }
+
+        // Download Chart Logic
+        document.getElementById('download-chart-btn').addEventListener('click', () => {
+            if (chartInstance) {
+                const link = document.createElement('a');
+                link.download = 'scatterplot.png';
+                link.href = document.getElementById('scatter-chart').toDataURL('image/png');
+                link.click();
+            }
+        });
+    </script>
+</body>
+</html>
